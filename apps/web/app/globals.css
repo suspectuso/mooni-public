@@ -1,0 +1,329 @@
+@import 'tailwindcss';
+
+@font-face {
+	font-family: 'Coolvetica';
+	src: url('/font/coolveticaRg.ttf') format('truetype');
+	font-weight: normal;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'LT Superior';
+	src: url('/font/LTSuperior-Regular.otf') format('opentype');
+	font-weight: 400;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'LT Superior';
+	src: url('/font/LTSuperior-Medium.otf') format('opentype');
+	font-weight: 500;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'LT Superior';
+	src: url('/font/LTSuperior-Semibold.otf') format('opentype');
+	font-weight: 600;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'LT Superior';
+	src: url('/font/LTSuperior-Bold.otf') format('opentype');
+	font-weight: 700;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Oks';
+	src: url('/font/Oks.otf') format('opentype');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	--background: #121212;
+	--foreground: #ffffff;
+	--accent-red: #fc2a0d;
+	--accent-yellow: #e6f43f;
+
+	/* Telegram WebApp theme variables */
+	--tg-theme-bg-color: #121212;
+	--tg-theme-text-color: #ffffff;
+	--tg-theme-hint-color: rgba(252, 249, 247, 0.5);
+	--tg-theme-link-color: #65fff7;
+	--tg-theme-button-color: #65fff7;
+	--tg-theme-button-text-color: #121212;
+	--tg-theme-secondary-bg-color: #272727;
+}
+
+html {
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	cursor: default;
+}
+
+body {
+	color: var(--foreground);
+	background: var(--background);
+	font-family:
+		'LT Superior',
+		-apple-system,
+		BlinkMacSystemFont,
+		'Segoe UI',
+		Roboto,
+		sans-serif;
+	max-width: 480px;
+	margin: 0 auto;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-overflow-scrolling: touch;
+	-webkit-text-size-adjust: 100%;
+	-moz-text-size-adjust: 100%;
+	-ms-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+	overflow-x: hidden;
+	min-height: 100vh;
+}
+
+/* Для интерактивных элементов */
+button,
+a,
+[role='button'] {
+	cursor: pointer;
+}
+
+/* Для инпутов */
+input,
+textarea,
+select {
+	cursor: text;
+}
+
+/* Для перетаскиваемых элементов */
+[draggable='true'],
+.draggable {
+	cursor: grab;
+	user-select: none;
+}
+
+[draggable='true']:active,
+.draggable:active {
+	cursor: grabbing;
+}
+
+#__next {
+	overflow-x: hidden;
+	width: 100%;
+	max-width: 100vw;
+	min-height: 100vh;
+}
+
+/* Кастомный скроллбар для ПК */
+#__next::-webkit-scrollbar {
+	width: 8px;
+}
+
+#__next::-webkit-scrollbar-track {
+	background: rgba(252, 249, 247, 0.05);
+}
+
+#__next::-webkit-scrollbar-thumb {
+	background: rgba(252, 249, 247, 0.2);
+	border-radius: 4px;
+}
+
+#__next::-webkit-scrollbar-thumb:hover {
+	background: rgba(252, 249, 247, 0.3);
+}
+
+* {
+	box-sizing: border-box;
+	padding: 0;
+	margin: 0;
+	-webkit-tap-highlight-color: transparent;
+	max-width: 100%;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+/* Запрет zoom на изображениях и других элементах */
+img,
+video,
+canvas,
+svg {
+	touch-action: none !important;
+	-webkit-user-drag: none;
+	-webkit-touch-callout: none;
+}
+
+/* Для контейнеров с изображениями - разрешаем pan но запрещаем pinch */
+div,
+section,
+article {
+	touch-action: pan-y pan-x;
+}
+
+/* Разрешаем выделение только для инпутов и текстовых полей */
+input,
+textarea,
+[contenteditable='true'] {
+	-webkit-user-select: text !important;
+	-moz-user-select: text !important;
+	-ms-user-select: text !important;
+	user-select: text !important;
+	font-size: 16px; /* Предотвращает автозум на iOS */
+	-webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	font-family: 'Coolvetica', sans-serif;
+}
+
+/* Hide scrollbars for horizontal scroll containers */
+*::-webkit-scrollbar {
+	display: none;
+}
+
+* {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+/* Показываем скроллбар только для #__next */
+#__next::-webkit-scrollbar {
+	display: block;
+}
+
+/* Smooth animations */
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes slideUp {
+	from {
+		transform: translateY(20px);
+		opacity: 0;
+	}
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+@keyframes slideDown {
+	from {
+		transform: translateY(-20px);
+		opacity: 0;
+	}
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+@keyframes scaleIn {
+	from {
+		transform: scale(0.95);
+		opacity: 0;
+	}
+	to {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes pulse {
+	0% {
+		opacity: 0;
+		transform: scale(0.8);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1.05);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(1);
+	}
+}
+
+@keyframes gradientPulse {
+	0% {
+		opacity: 0;
+		transform: translate(-50%, -50%) scale(0.8);
+	}
+	50% {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1.05);
+	}
+	100% {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1);
+	}
+}
+
+@keyframes waveRays {
+	0% { opacity: 0.4; transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+	50% { opacity: 0.7; transform: translate(-50%, -50%) rotate(5deg) scale(1.05); }
+	100% { opacity: 0.4; transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+}
+
+@keyframes rotateAura {
+	from { transform: translate(-50%, -50%) rotate(0deg); }
+	to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes rotateAuraReverse {
+	from { transform: translate(-50%, -50%) rotate(360deg); }
+	to { transform: translate(-50%, -50%) rotate(0deg); }
+}
+
+@keyframes shake {
+	0%, 100% { transform: translateX(0) rotate(0deg); }
+	10%, 30%, 50%, 70%, 90% { transform: translateX(-5px) rotate(-2deg); }
+	20%, 40%, 60%, 80% { transform: translateX(5px) rotate(2deg); }
+}
+
+@keyframes navScaleIn {
+	0% { transform: scale(0.8); opacity: 0.5; }
+	50% { transform: scale(1.1); }
+	100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes heartExplosion {
+	0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+	25% { transform: translate(-50%, -50%) scale(1.3) rotate(5deg); }
+	50% { transform: translate(-50%, -50%) scale(1) rotate(-3deg); }
+	75% { transform: translate(-50%, -50%) scale(1.15) rotate(2deg); }
+	100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+}
+
+/* Карта: шиммер-скелетон при загрузке (канон C2) */
+@keyframes lumiShimmer {
+	0% { background-position: 200% 0; }
+	100% { background-position: -200% 0; }
+}

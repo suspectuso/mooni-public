@@ -1,0 +1,65 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Prisma generate
+        run: pnpm --filter @mooni/api exec prisma generate
+      - name: Code style (Prettier)
+        run: pnpm format:check
+      - name: Lint (web)
+        run: pnpm lint
+        continue-on-error: true
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: https://mooni.suspectuso.ru/api
+          NEXT_PUBLIC_BACKEND_URL: http://localhost:8001
+
+  deploy:
+    name: Deploy to play2go
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /opt/mooni
+            git fetch origin main
+            git reset --hard origin/main
+            pnpm install --no-frozen-lockfile
+            set -a; . ./.env; set +a
+            pnpm --filter @mooni/api exec prisma generate
+            pnpm --filter @mooni/api exec prisma db push --skip-generate --accept-data-loss
+            pnpm --filter @mooni/api build
+            pnpm --filter @mooni/web build
+            systemctl restart mooni-api mooni-web
+            for i in $(seq 1 12); do sleep 3; curl -sf http://127.0.0.1:8001/api/health && break; done

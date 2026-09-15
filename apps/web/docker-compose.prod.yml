@@ -1,0 +1,24 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://crm.suspectuso.ru/api
+        NEXT_PUBLIC_BACKEND_URL: https://crm.suspectuso.ru
+    container_name: match_frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=https://crm.suspectuso.ru
+      - NEXT_PUBLIC_API_URL=https://crm.suspectuso.ru/api
+      - BACKEND_URL=http://host.docker.internal:8001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3030:3030"
+    networks:
+      - match_network
+
+networks:
+  match_network:
+    driver: bridge

@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mooni_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mooni
+    ports:
+      - '5432:5432'
+    volumes:
+      - mooni_pg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: mooni_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+volumes:
+  mooni_pg:

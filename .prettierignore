@@ -1,0 +1,15 @@
+node_modules
+dist
+.next
+.claude
+.gstack
+build
+coverage
+pnpm-lock.yaml
+*.md
+# Match-фронт держит свой стиль (проверяется next lint), Prettier его не трогает
+apps/web
+# генерится Prisma
+apps/api/prisma/migrations
+
+.env.example

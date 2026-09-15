@@ -1,0 +1,129 @@
+{
+	"id": "MooniOSMPlaces01",
+	"name": "Mooni — места из OpenStreetMap (Overpass → AI → модерация)",
+	"nodes": [
+		{
+			"parameters": {},
+			"id": "a0000000-0000-4000-8000-000000000000",
+			"name": "Запуск вручную (тест)",
+			"type": "n8n-nodes-base.manualTrigger",
+			"typeVersion": 1,
+			"position": [-220, 140]
+		},
+		{
+			"parameters": {
+				"rule": { "interval": [{ "field": "days", "daysInterval": 1 }] }
+			},
+			"id": "a0000000-0000-4000-8000-000000000001",
+			"name": "Расписание (раз в день)",
+			"type": "n8n-nodes-base.scheduleTrigger",
+			"typeVersion": 1.2,
+			"position": [-220, 300]
+		},
+		{
+			"parameters": {
+				"method": "POST",
+				"url": "https://overpass-api.de/api/interpreter",
+				"sendBody": true,
+				"contentType": "form-urlencoded",
+				"bodyParameters": {
+					"parameters": [
+						{
+							"name": "data",
+							"value": "[out:json][timeout:25];node[\"amenity\"=\"cafe\"][\"name\"](59.92,30.30,59.95,30.38);out 15;"
+						}
+					]
+				},
+				"options": { "timeout": 30000 }
+			},
+			"id": "a0000000-0000-4000-8000-000000000002",
+			"name": "OSM Overpass",
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.2,
+			"position": [0, 300],
+			"retryOnFail": true,
+			"maxTries": 3,
+			"waitBetweenTries": 5000
+		},
+		{
+			"parameters": {
+				"jsCode": "const els = $input.first().json.elements || []\nconst slug = { cafe: 'cafe', bar: 'bar', pub: 'bar', restaurant: 'restaurant' }\nreturn els.filter(e => e.tags && e.tags.name).map(e => ({ json: {\n  externalId: 'osm-' + e.id,\n  name: e.tags.name,\n  lat: e.lat ?? null,\n  lng: e.lon ?? null,\n  categorySlug: slug[e.tags.amenity] || 'cafe',\n} }))"
+			},
+			"id": "a0000000-0000-4000-8000-000000000003",
+			"name": "Парсинг OSM",
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [220, 300]
+		},
+		{
+			"parameters": {
+				"method": "POST",
+				"url": "http://127.0.0.1:11434/api/generate",
+				"sendBody": true,
+				"contentType": "json",
+				"specifyBody": "json",
+				"jsonBody": "={{ JSON.stringify({ model: \"qwen2.5:14b-instruct\", stream: false, format: \"json\", prompt: \"Место в Санкт-Петербурге: \\\"\" + $json.name + \"\\\" (категория: \" + $json.categorySlug + \"). Придумай по названию короткое привлекательное описание (1-2 предложения) и теги настроения. Верни СТРОГО JSON {description: строка, moodTags: массив из cozy, romantic, active, calm, party, culture, nature, work, district: район СПб или null}.\" }) }}",
+				"options": { "timeout": 90000 }
+			},
+			"id": "a0000000-0000-4000-8000-000000000004",
+			"name": "AI-описание (Ollama)",
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.2,
+			"position": [440, 300]
+		},
+		{
+			"parameters": {
+				"mode": "runOnceForEachItem",
+				"jsCode": "let ai = {}\ntry { ai = JSON.parse($json.response || '{}') } catch (e) { ai = {} }\nconst osm = $('Парсинг OSM').item.json\nreturn { json: {\n  source: 'osm',\n  externalId: osm.externalId,\n  text: osm.name + ' — ' + (ai.description || '') + ' [OSM ' + osm.lat + ',' + osm.lng + ']',\n  suggestion: {\n    name: osm.name,\n    description: ai.description || null,\n    categorySlug: osm.categorySlug,\n    district: ai.district || null,\n    lat: osm.lat,\n    lng: osm.lng,\n    tags: [],\n    moodTags: Array.isArray(ai.moodTags) ? ai.moodTags : [],\n  },\n} }"
+			},
+			"id": "a0000000-0000-4000-8000-000000000005",
+			"name": "Сборка suggestion",
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [660, 300]
+		},
+		{
+			"parameters": {
+				"method": "POST",
+				"url": "https://mooni.suspectuso.ru/api/ingestion/raw",
+				"sendHeaders": true,
+				"headerParameters": {
+					"parameters": [
+						{ "name": "X-Ingest-Secret", "value": "7675b473e8f3d1a4ea47ebcc" }
+					]
+				},
+				"sendBody": true,
+				"contentType": "json",
+				"specifyBody": "json",
+				"jsonBody": "={{ JSON.stringify({ source: $json.source, externalId: $json.externalId, text: $json.text, suggestion: $json.suggestion }) }}",
+				"options": {}
+			},
+			"id": "a0000000-0000-4000-8000-000000000006",
+			"name": "→ Mooni ingestion",
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 4.2,
+			"position": [880, 300]
+		}
+	],
+	"connections": {
+		"Запуск вручную (тест)": {
+			"main": [[{ "node": "OSM Overpass", "type": "main", "index": 0 }]]
+		},
+		"Расписание (раз в день)": {
+			"main": [[{ "node": "OSM Overpass", "type": "main", "index": 0 }]]
+		},
+		"OSM Overpass": {
+			"main": [[{ "node": "Парсинг OSM", "type": "main", "index": 0 }]]
+		},
+		"Парсинг OSM": {
+			"main": [[{ "node": "AI-описание (Ollama)", "type": "main", "index": 0 }]]
+		},
+		"AI-описание (Ollama)": {
+			"main": [[{ "node": "Сборка suggestion", "type": "main", "index": 0 }]]
+		},
+		"Сборка suggestion": {
+			"main": [[{ "node": "→ Mooni ingestion", "type": "main", "index": 0 }]]
+		}
+	},
+	"settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,16 @@
+[Unit]
+Description=Mooni API (NestJS)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mooni/apps/api
+EnvironmentFile=/opt/mooni/.env
+ExecStart=/usr/bin/node dist/src/main.js
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

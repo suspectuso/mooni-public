@@ -1,0 +1,17 @@
+[Unit]
+Description=Mooni Web (Next.js)
+After=network.target mooni-api.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mooni/apps/web
+EnvironmentFile=/opt/mooni/.env
+ExecStart=/usr/bin/pnpm start
+Restart=always
+RestartSec=3
+User=root
+Environment=NODE_ENV=production
+Environment=PORT=3030
+
+[Install]
+WantedBy=multi-user.target

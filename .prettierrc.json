@@ -1,0 +1,13 @@
+{
+	"semi": false,
+	"singleQuote": true,
+	"trailingComma": "all",
+	"useTabs": true,
+	"printWidth": 80,
+	"overrides": [
+		{
+			"files": ["packages/shared/**/*.ts", "apps/api/**/*.ts"],
+			"options": { "useTabs": false }
+		}
+	]
+}

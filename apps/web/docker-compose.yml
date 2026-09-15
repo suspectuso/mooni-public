@@ -1,0 +1,22 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://exile.beauty/api
+        NEXT_PUBLIC_BACKEND_URL: https://exile.beauty/api
+    container_name: habits_frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=https://exile.beauty/api
+      - NEXT_PUBLIC_BACKEND_URL=https://exile.beauty/api
+      - PORT=3030
+    ports:
+      - "3030:3030"
+    networks:
+      - habits_network
+
+networks:
+  habits_network:
+    driver: bridge

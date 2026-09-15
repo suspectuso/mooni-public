@@ -1,0 +1,369 @@
+// Mooni — схема v1. Ядро: Place + Swipe → Route.
+// Паттерн буфера фида (feedBuffer/recentSeenIds/...) перенесён из Match feed.service.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Пользователь ─────────────────────────
+model User {
+  id         String   @id @default(cuid())
+  telegramId BigInt   @unique
+  username   String?
+  firstName  String?
+  psychotype String?
+  currentMood String?
+  xp         Int      @default(0)
+  susCoin    Int      @default(0)
+  premiumUntil DateTime?
+
+  // буфер ленты (порт из Match) — дёшево, без отдельной таблицы
+  feedBuffer    Json @default("[]") // string[] id мест
+  recentSeenIds Json @default("[]") // string[]
+  lastSeenMap   Json @default("{}") // Record<placeId, ISO date>
+  seenCounts    Json @default("{}") // Record<placeId, number>
+  feedUpdatedAt DateTime?
+
+  interests    UserInterest[]
+  swipes       Swipe[]
+  routes       Route[]
+  achievements UserAchievement[]
+  slotsCreated ActivitySlot[]        @relation("SlotsCreated")
+  slotsJoined  ActivityParticipant[] @relation("SlotsJoined")
+  qrRedemptions QrRedemption[]
+  bookings      Booking[]
+  payments      Payment[]
+  coffeeRequests CoffeeRequest[]
+  ledger        BalanceLedger[]
+  missions      UserMission[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Аудит-леджер: каждое изменение susCoin/xp пишется отдельной записью (трейсинг/анти-фрод).
+model BalanceLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // susCoin | xp
+  delta     Int
+  reason    String // qr_redeem | topup | route_progress | ...
+  refId     String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model UserInterest {
+  id     String @id @default(cuid())
+  userId String
+  tag    String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tag])
+  @@index([userId])
+}
+
+// ───────────────────────── Места ─────────────────────────
+model PlaceCategory {
+  id     String  @id @default(cuid())
+  slug   String  @unique
+  title  String
+  places Place[]
+}
+
+model Place {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  categoryId   String
+  category     PlaceCategory @relation(fields: [categoryId], references: [id])
+  district     String?
+  lat          Float?
+  lng          Float?
+  tags         String[]
+  moodTags     String[]
+  photos       String[]
+  priceLevel   Int?
+  minLevel     Int           @default(1) // секретные места: видны с этого городского уровня
+  source       String?       // "seed" | "n8n:@channel" | "manual"
+  sourcePostId String?
+  active       Boolean       @default(true)
+  embedding    Json?         // вектор nomic-embed-text для семантического подбора
+
+  swipes      Swipe[]
+  routePoints RoutePoint[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([district])
+}
+
+// ───────────────────────── Свайп (тиндер мест) ─────────────────────────
+model Swipe {
+  id        String   @id @default(cuid())
+  userId    String
+  placeId   String
+  liked     Boolean
+  moodAt    String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, placeId])
+  @@index([userId, liked])
+}
+
+// ───────────────────────── Маршрут (из лайков) ─────────────────────────
+model Route {
+  id        String       @id @default(cuid())
+  userId    String
+  title     String
+  mood      String?
+  status    String       @default("draft") // draft | active | completed
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    RoutePoint[]
+  createdAt DateTime     @default(now())
+
+  @@index([userId])
+}
+
+model RoutePoint {
+  id      String  @id @default(cuid())
+  routeId String
+  placeId String
+  order   Int
+  note    String?
+  done    Boolean @default(false)
+  route   Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  place   Place   @relation(fields: [placeId], references: [id])
+
+  @@unique([routeId, order])
+  @@index([routeId])
+}
+
+// ───────────────────────── Коммьюнити-слоты ─────────────────────────
+model ActivitySlot {
+  id              String   @id @default(cuid())
+  creatorId       String
+  title           String
+  type            String   // sport | boardgames | walk | coworking | photo
+  placeName       String?
+  district        String?
+  startsAt        DateTime
+  minParticipants Int      @default(2)
+  maxParticipants Int      @default(10)
+  status          String   @default("open") // open | confirmed | canceled | done
+  creator         User     @relation("SlotsCreated", fields: [creatorId], references: [id], onDelete: Cascade)
+  participants    ActivityParticipant[]
+  createdAt       DateTime @default(now())
+
+  @@index([status, startsAt])
+}
+
+model ActivityParticipant {
+  id      String       @id @default(cuid())
+  slotId  String
+  userId  String
+  status  String       @default("joined") // joined | left
+  slot    ActivitySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  user    User         @relation("SlotsJoined", fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime    @default(now())
+
+  @@unique([slotId, userId])
+  @@index([slotId])
+}
+
+// ───────────────────────── Афиша ─────────────────────────
+model Event {
+  id         String   @id @default(cuid())
+  title      String
+  category   String
+  placeId    String?
+  placeName  String?
+  district   String?
+  startsAt   DateTime
+  lat        Float?
+  lng        Float?
+  imageUrl   String?
+  source     String?
+  externalId String? // id во внешнем источнике (KudaGo и т.п.) для дедупа
+  createdAt  DateTime @default(now())
+
+  @@unique([source, externalId])
+  @@index([startsAt])
+}
+
+// ───────────────────────── Геймификация ─────────────────────────
+model Achievement {
+  id     String  @id @default(cuid())
+  key    String  @unique
+  title  String
+  level  String // base | advanced | epic
+  rule   Json
+  season String? // сезонная ачивка: winter | spring | white_nights | autumn
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  source        String?
+  memoryPhoto   String?
+  memoryNote    String?
+  mood          String?
+  earnedAt      DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+}
+
+// ───────────────────────── City Missions ─────────────────────────
+// Городские миссии: выполнил действие → забрал награду (susCoin/xp). Claim один раз.
+model UserMission {
+  id          String   @id @default(cuid())
+  userId      String
+  missionKey  String
+  claimedAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionKey])
+  @@index([userId])
+}
+
+// ───────────────────────── Каталог локальных услуг ─────────────────────────
+// Гиды по крышам, фотографы, экскурсоводы, аренда залов — ниша, которой нет в агрегаторах.
+model LocalService {
+  id          String   @id @default(cuid())
+  name        String
+  type        String // guide | photographer | rooftop | venue | excursion | other
+  description String?
+  priceFrom   Int? // ₽ «от»
+  contact     String? // @username / телефон / ссылка
+  photo       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([type])
+}
+
+// ───────────────────────── Ingestion ─────────────────────────
+model RawPost {
+  id         String   @id @default(cuid())
+  source     String
+  externalId String
+  text       String
+  mediaUrls  String[]
+  suggestion Json? // структурная подсказка AI/OSM: {name, categorySlug, district, lat, lng, tags, moodTags, photos, description}
+  status     String   @default("new") // new | processed | rejected
+  placeId    String?
+  createdAt  DateTime @default(now())
+
+  @@unique([source, externalId])
+}
+
+// ───────────────────────── Random Coffee ─────────────────────────
+model CoffeeRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  kind        String   @default("coffee") // coffee | walk | friending | buddy
+  status      String   @default("waiting") // waiting | matched | canceled
+  matchedWith String? // userId партнёра
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+// ───────────────────────── Партнёры / QR / susCoin (v3) ─────────────────────────
+model Partner {
+  id        String   @id @default(cuid())
+  name      String
+  category  String?
+  district  String?
+  qrCodes   QrCode[]
+  createdAt DateTime @default(now())
+}
+
+model QrCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  partnerId   String
+  rewardCoins Int      @default(10)
+  rewardXp    Int      @default(5)
+  perUserOnce Boolean  @default(true)
+  active      Boolean  @default(true)
+  partner     Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  redemptions QrRedemption[]
+  createdAt   DateTime @default(now())
+}
+
+model QrRedemption {
+  id        String   @id @default(cuid())
+  userId    String
+  qrCodeId  String
+  coins     Int
+  xp        Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  qrCode    QrCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, qrCodeId])
+  @@index([userId])
+}
+
+// ───────────────────────── Маркет впечатлений (v3) ─────────────────────────
+model Experience {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  category    String?
+  price       Int       @default(0) // рубли
+  photo       String?
+  active      Boolean   @default(true)
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+}
+
+model Booking {
+  id           String     @id @default(cuid())
+  userId       String
+  experienceId String
+  status       String     @default("requested") // requested | confirmed | canceled
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@index([userId])
+}
+
+// ───────────────────────── Платежи (ЮKassa / xRocket) ─────────────────────────
+model Payment {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String   // yookassa | xrocket
+  purpose    String   // premium | booking | topup
+  amount     Int      // ЮKassa — рубли; xRocket — центы USDT
+  currency   String   @default("RUB")
+  status     String   @default("pending") // pending | paid | failed
+  externalId String?  // id платежа/инвойса у провайдера
+  refId      String?  // напр. bookingId для purpose=booking
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([externalId])
+}
